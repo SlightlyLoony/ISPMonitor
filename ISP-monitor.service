@@ -1,0 +1,14 @@
+[Unit]
+Description=ISP Monitor
+After=syslog.target
+
+[Service]
+User=ispmon
+Type=simple
+WorkingDirectory=/apps/ispmon
+ExecStart=/usr/bin/java -jar /apps/ispmon/ISPMonitor.jar /apps/ispmon/isp_monitor_config.json
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

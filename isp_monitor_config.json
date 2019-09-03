@@ -1,0 +1,8 @@
+{
+  "name":"isp",
+  "secret":"4WZ8jsJdCM3EVJG+3wyCszu50a+4krTbTuAtEm6ZAFc",
+  "queueSize":100,
+  "cpoHost":"cpo.dilatush.com",
+  "cpoPort":4000,
+  "monitorInterval":60
+}
