@@ -3,6 +3,7 @@ package com.dilatush.ispmonitor;
 import com.dilatush.mop.Mailbox;
 import com.dilatush.mop.PostOffice;
 import com.dilatush.util.Config;
+import com.dilatush.util.Executor;
 
 import java.io.File;
 import java.util.logging.Level;
@@ -43,6 +44,8 @@ public class Main {
         mailbox = po.createMailbox( "monitor" );
 
         // get the current setting of the default route in the router...
+        String isp = new Executor( "ssh houserouter \"system script run get_isp\"" ).run();
 
+        isp.hashCode();
     }
 }

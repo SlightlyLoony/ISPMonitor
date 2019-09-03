@@ -9,4 +9,4 @@ The entire system includes the following components:
   - *set_secondary*: sets the default route to the secondary ISP modem, and returns "SUCCESS" or "ERROR".
   - *get_isp*: returns "PRIMARY" if the default route is currently set to the primary ISP modem, "SECONDARY" if the default route is currently set to the secondary ISP modem, or "ERROR" if neither. 
 - **Linux Server**: this box hosts the ISPMonitor program, which runs as a systemd service.  In the author's case, this is a Dell PowerEdge T640.
-- **ISPMonitor**: a Java program that uses dig to monitor the state of the ISP connections.  When appropriate, it also runs router scripts (via SSH) to change the router's default route to an ISP that is up.
+- **ISPMonitor**: a Java program that uses dig to monitor the state of the ISP connections.  When appropriate, it also runs router scripts (via SSH) to change the router's default route to an ISP that is up.  This program normally runs as the user *isp_mon*, which has a private key for SSH into the router.
