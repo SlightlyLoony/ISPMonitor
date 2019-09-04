@@ -7,6 +7,8 @@ The entire system includes the following components:
 - **Border Router**: This is the router at the edge of the local network, connected to both of the ISP modems.  In the author's case, this is a MikroTik RouterBoard 1100AHx2 router.  The router contains the public key for an SSH user ("HMFIC"), and it has three scripts that can be run remotely (via SSH):
   - *set_primary*: sets the default route to the primary ISP modem, and returns "SUCCESS" or "ERROR".
   - *set_secondary*: sets the default route to the secondary ISP modem, and returns "SUCCESS" or "ERROR".
-  - *get_isp*: returns "PRIMARY" if the default route is currently set to the primary ISP modem, "SECONDARY" if the default route is currently set to the secondary ISP modem, or "ERROR" if neither. 
+  - *get_isp*: returns "PRIMARY" if the default route is currently set to the primary ISP modem, "SECONDARY" if the default route is currently set to the secondary ISP modem, or "ERROR" if neither.
+  
+  The router must have two interfaces dedicated to the ISP connections (one for the primary, one for the secondary).  In addition it must be configured with routes for the DNS servers used for testing, such that the primary ISP's DNS servers are routed ONLY to the primary ISP's modem, and the secondary ISP's DNS servers are routed ONLY to the secondary ISP's modem.
 - **Linux Server**: this box hosts the ISPMonitor program, which runs as a systemd service.  In the author's case, this is a Dell PowerEdge T640.
 - **ISPMonitor**: a Java program that uses dig to monitor the state of the ISP connections.  When appropriate, it also runs router scripts (via SSH) to change the router's default route to an ISP that is up.  This program normally runs as the user *isp_mon*, which has a private key for SSH into the router.

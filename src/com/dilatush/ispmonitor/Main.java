@@ -34,10 +34,23 @@ public class Main {
         }
 
         // get our configuration file...
-        Config ntpConfig = Config.fromJSONFile( config );
-        long monitorIntervalSeconds = ntpConfig.optLongDotted( "monitorInterval", 60 );
+        Config ispMonConfig = Config.fromJSONFile( config );
+        long monitorIntervalSeconds = ispMonConfig.optLongDotted( "monitorInterval", 60 );
         long monitorInterval = 1000 * monitorIntervalSeconds;
         LOGGER.log( Level.INFO, "ISP Monitor is starting, publishing updates at " + monitorIntervalSeconds + " second intervals" );
+
+        // get our ISP information...
+        ISPInfo primary = new ISPInfo(
+                ispMonConfig.getStringDotted( "primary.name"   ),
+                ispMonConfig.getStringDotted( "primary.dns1"   ),
+                ispMonConfig.getStringDotted( "primary.dns2"   ) );
+        ISPInfo secondary = new ISPInfo(
+                ispMonConfig.getStringDotted( "secondary.name" ),
+                ispMonConfig.getStringDotted( "secondary.dns1" ),
+                ispMonConfig.getStringDotted( "secondary.dns2" ) );
+
+        // set up our digger and get the starting state...
+
 
         // start up our post office...
         PostOffice po = new PostOffice( config );
@@ -49,10 +62,3 @@ public class Main {
         isp.hashCode();
     }
 }
-// xfinity
-// 75.75.75.75
-// 75.75.76.76
-
-// verizon
-// 198.224.164.135
-// 198.224.160.135
