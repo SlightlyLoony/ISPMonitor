@@ -49,8 +49,12 @@ public class Main {
                 ispMonConfig.getStringDotted( "secondary.dns1" ),
                 ispMonConfig.getStringDotted( "secondary.dns2" ) );
 
-        // set up our digger and get the starting state...
+        // get the domains we're going to test in DNS...
+        String[] domains = ispMonConfig.getStringDotted( "domains" ).split( "," );
 
+        // test code...
+        DNSDigger digger = new DNSDigger( secondary.dns1, domains );
+        boolean dug = digger.test();
 
         // start up our post office...
         PostOffice po = new PostOffice( config );
