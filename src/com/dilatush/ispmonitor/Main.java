@@ -49,12 +49,19 @@ public class Main {
                 ispMonConfig.getStringDotted( "secondary.dns1" ),
                 ispMonConfig.getStringDotted( "secondary.dns2" ) );
 
-        // get the domains we're going to test in DNS...
-        String[] domains = ispMonConfig.getStringDotted( "domains" ).split( "," );
+        // get the DNSDigger config...
+        String[] domains       = ispMonConfig.getStringDotted( "DNSDigger.domains"          ).split( "," );
+        long statistics_period = ispMonConfig.getLongDotted(   "DNSDigger.statisticsPeriod" );
+        int tries              = ispMonConfig.getIntDotted(    "DNSDigger.tries"            );
 
         // test code...
-        DNSDigger digger = new DNSDigger( secondary.dns1, domains );
-        boolean dug = digger.test();
+        ISPTester isp2 = new ISPTester( secondary, domains, statistics_period, tries );
+        for( int i = 0; i < 10; i++ ) {
+
+            Thread.sleep( 2000 );
+            boolean dug = isp2.test();
+        }
+        double availability = isp2.availability();
 
         // start up our post office...
         PostOffice po = new PostOffice( config );
