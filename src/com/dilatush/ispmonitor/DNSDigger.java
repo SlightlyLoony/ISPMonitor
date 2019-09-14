@@ -54,27 +54,27 @@ public class DNSDigger {
     public boolean test() {
 
         int triesSoFar = 0;
-        State state = State.DOWN;  // we assume down until proven otherwise...
+        SystemAvailability systemAvailability = SystemAvailability.DOWN;  // we assume down until proven otherwise...
         do {
 
             // execute dig to test current availability of the DNS server at the address in this instance...
             // exit code of zero means all worked; anything else means some sort of problem (and we don't care what kind)...
             if( 0 == dig() )
-                state = State.UP;
+                systemAvailability = SystemAvailability.UP;
 
             triesSoFar++;
 
-        } while( (state == State.DOWN) && (triesSoFar < tries) );  // keep trying until we see the DNS server up, or we've tried all that we should...
+        } while( (systemAvailability == SystemAvailability.DOWN) && (triesSoFar < tries) );  // keep trying until we see the DNS server up, or we've tried all that we should...
 
         // update our retry counter...
         retries += (triesSoFar - 1);
 
         // update our stats...
-        stats.update( state );
+        stats.update( systemAvailability );
 
         // log and return our results...
-        LOGGER.fine( "DNS server at " + address + " is " + state );
-        return (state == State.UP);
+        LOGGER.fine( "DNS server at " + address + " is " + systemAvailability );
+        return (systemAvailability == SystemAvailability.UP);
     }
 
 

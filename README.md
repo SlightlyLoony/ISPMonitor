@@ -1,5 +1,17 @@
 #ISP Monitor
-Part of a system for monitoring the state of two Internet Service Provider (ISP) connections (primary and secondary), and automatically switching between them as the ISP connections go up or down.
+This program started out (as many do!) as a simple utility to monitor the state of our network's Internet Service Provider (ISP) connections.  It has evolved into something else entirely, performing the following:
+- **ISP monitoring**: monitoring the state of our two ISP connections:
+  - **Xfinity**: a 1000 mbps down, 350 mbps up connection through an Xfinity-provided cable modem.
+  - **Verizon**: a 10 mbps down, 5 mbps up connection through a Cradlepoint ARC CBA850 Branch LTE modem.  This is an LP6 LTE modem.
+- **ISP switching**: switching between the Xfinity (primary) and Verizon (secondary) connection as necessary to keep us connected to the Internet.
+- **General connectivity monitoring**: periodically test connection from the server running ISPMonitor to a configurable hierarchy of test devices.  The highest level of the hierarchy is the router the server is attached to; the next level devices reachable from that router, then the devices reachable from those devices, and so on.  No testing is performed at hierarchy levels lower than a device that failed the testing, as they can't be reached through a failed device.
+- **Tunneling services from remote servers**: set up and maintain configured "tunnels" (via SSH port forwarding) to remote servers not reachable through our private IP network (for example, a server hosted on AWS) so that services running on them can reach .  This includes the following (not in order):
+  - **Setting up and monitoring the SSH tunnel**: executing an appropriate SSH subprocess, and monitoring it and restarting it as necessary to handle networking glitches.
+  - **Monitoring SSH to the remote server**: mainly this means testing for basic SSH connectivity before doing anything more elaborate with SSH.
+  - **Tearing down remote services**: this is performed before switching ISPs, or after detecting that the remote services are down.  This is accomplished by a script or app on the remote server, invoked via SSH.
+  - **Starting up remote services**: this is performed after switching ISPs, or after detecting the remote services are down.  This is accomplished by a script or app on the remote server, invoked via SSH.
+  - **Monitor state of remote services**: monitor periodically to ensure that the services themselves are up, and not just the tunnel.  This is accomplished through some combination of a script or app on the rmote server, invoked via SSH, and monitoring for connections to CPO.
+  
 
 The entire system includes the following components:
 - **Primary ISP modem**: This modem provides the connectivity to the primary ISP.  In the author's case, this is an Xfinity-provided gigabit cable modem.
@@ -23,6 +35,7 @@ The entire system includes the following components:
 - **monitorInterval**: The interval (in seconds) between published monitor messages from ISPMonitor.
 - **minTestInterval**: The minimum interval, in seconds, between tests of a DNS server.
 - **maxTestInterval**: The maximum interval, in seconds, between tests of a DNS server.
+- **router**: the host name of the router that switches between primary and secondary ISPs.
 - **primary**: Specification of the primary ISP connection.
   - **name**: The user-readable name of the primary ISP.
   - **dns1**: The dotted-form IP address (like 23.23.23.23) of a DNS server that can be used to test connectivity to the primary ISP.

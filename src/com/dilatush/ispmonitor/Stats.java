@@ -25,20 +25,20 @@ public class Stats {
         statistics_period = _statistics_period;
 
         // add one record to our statistics, showing an assumed "UP" at instantiation time...
-        records.add( new StateRecord( State.UP ) );
+        records.add( new StateRecord( SystemAvailability.UP ) );
     }
 
 
     /**
      * Update the statistics records in this instance with the given state.
      *
-     * @param _state the state that should represent the most recent state being tracked
+     * @param _systemAvailability the state that should represent the most recent state being tracked
      */
-    public void update( final State _state ) {
+    public void update( final SystemAvailability _systemAvailability ) {
 
         // update our stats, adding a record if the current result is different than the most recent record...
-        if( records.get( records.size() - 1 ).state != _state )
-            records.add( new StateRecord( _state ) );
+        if( records.get( records.size() - 1 ).systemAvailability != _systemAvailability )
+            records.add( new StateRecord( _systemAvailability ) );
 
         // now prune any records that are too old, always leaving the most recent one (even if it IS old)...
         long threshold = System.currentTimeMillis() - statistics_period;
@@ -70,7 +70,7 @@ public class Stats {
             b = records.get( i + 1 );
 
             // update the appropriate accumulator...
-            if( b.state == State.UP )
+            if( b.systemAvailability == SystemAvailability.UP )
                 up += (b.timestamp - a.timestamp);
             else
                 dn += (b.timestamp - a.timestamp);
@@ -78,7 +78,7 @@ public class Stats {
 
         // add in the current period to the appropriate accumulator...
         b = records.get( records.size() - 1 );
-        if( b.state == State.UP )
+        if( b.systemAvailability == SystemAvailability.UP )
             up += (System.currentTimeMillis() - b.timestamp);
         else
             dn += (System.currentTimeMillis() - b.timestamp);

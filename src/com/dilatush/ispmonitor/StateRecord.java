@@ -5,17 +5,17 @@ package com.dilatush.ispmonitor;
  * <p>Instances of this class are immutable and threadsafe.</p>
  */
 class StateRecord {
-    public final State state;
+    public final SystemAvailability systemAvailability;
     public final long timestamp;
 
 
     /**
      * Creates a new instance of this class with the given attributes.
      *
-     * @param _state  the state (UP or DOWN) of the DNS server
+     * @param _systemAvailability  the state (UP or DOWN) of the DNS server
      */
-    public StateRecord( final State _state ) {
-        state = _state;
+    public StateRecord( final SystemAvailability _systemAvailability ) {
+        systemAvailability = _systemAvailability;
         timestamp = System.currentTimeMillis();
     }
 }

@@ -70,7 +70,7 @@ public class ISPTester {
         }
 
         // track our statistics...
-        stats.update( ispUp ? State.UP : State.DOWN );
+        stats.update( ispUp ? SystemAvailability.UP : SystemAvailability.DOWN );
 
         // log and return our result...
         LOGGER.fine( "ISP " + isp.name + " is " + (ispUp ? "UP" : "DOWN") );
