@@ -86,12 +86,14 @@ public class DNSTester {
         private final int maxMs;
         private final EventType type;
 
+
         private DNSTest( final String _dnsServerAddress, final int _maxMs, final String _domain, final EventType _type ) {
             address = _dnsServerAddress;
             domain  = _domain;
             maxMs   = _maxMs;
             type    = _type;
         }
+
 
         @Override
         public void run() {

@@ -7,6 +7,7 @@ package com.dilatush.ispmonitor;
  */
 public enum EventType {
 
+    Heartbeat,
     PrimaryISPDNS1State,
     PrimaryISPDNS2State,
     SecondaryISPDNS1State,
@@ -15,4 +16,7 @@ public enum EventType {
     SecondaryISPRawState,
     PrimaryISPAvailabilityChanged,
     SecondaryISPAvailabilityChanged,
+    CPOQueryTimeout,
+    POConnected,
+    PODisconnected,
 }

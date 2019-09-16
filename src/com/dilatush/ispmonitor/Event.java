@@ -1,5 +1,7 @@
 package com.dilatush.ispmonitor;
 
+import static com.dilatush.util.General.isNull;
+
 /**
  * Simple POJO to contain an event type and optional payload.
  *
@@ -19,5 +21,13 @@ public class Event {
     /* package-private */ Event( final EventType _type, final Object _payload ) {
         type = _type;
         payload = _payload;
+    }
+
+
+    public String toString() {
+        if( isNull( payload ) )
+            return type.toString();
+        assert payload != null;
+        return type.toString() + " " + payload.toString();
     }
 }
