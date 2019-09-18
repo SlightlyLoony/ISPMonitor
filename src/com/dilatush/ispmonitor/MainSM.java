@@ -1,5 +1,6 @@
 package com.dilatush.ispmonitor;
 
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.*;
@@ -49,8 +50,7 @@ public class MainSM implements StateMachine<MainState> {
      */
     public void handleEvent( final Event _event ) {
 
-        if( _event.type != Heartbeat )
-            LOGGER.finest( "MainSM handling " + _event );
+        LOGGER.log( _event.type == Heartbeat ? Level.FINEST : Level.FINER, "MainSM handling " + _event );
 
         switch( _event.type ) {
 
@@ -61,6 +61,7 @@ public class MainSM implements StateMachine<MainState> {
             case SecondaryISPDNS2State:    handleSecondaryISPDNS2State( (SystemAvailability) _event.payload ); break;
             case PrimaryISPRawState:       handlePrimaryISPRawState(    (SystemAvailability) _event.payload ); break;
             case SecondaryISPRawState:     handleSecondaryISPRawState(  (SystemAvailability) _event.payload ); break;
+            case RouterISP:                handleRouterISP(             (ISPUsed)            _event.payload ); break;
             default:
                 LOGGER.warning( "Unknown event type (" + _event.type + ") received by state machine; ignoring" );
         }
@@ -95,6 +96,11 @@ public class MainSM implements StateMachine<MainState> {
                 startupSettlingTicks = 0;
             }
         }
+    }
+
+
+    private void handleRouterISP( final ISPUsed _ispUsed ) {
+
     }
 
 

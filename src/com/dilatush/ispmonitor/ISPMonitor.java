@@ -66,8 +66,15 @@ public class ISPMonitor {
         long monitorInterval = 1000 * monitorIntervalSeconds;
         LOGGER.log( Level.INFO, "ISP Monitor is starting, publishing updates at " + monitorIntervalSeconds + " second intervals" );
 
-        // get our router...
-        Router router = new Router( ispMonConfig.getStringDotted( "router" ) );
+        // set up our task queue...
+        tasks = new LinkedBlockingQueue<>( MAX_QUEUED_TASKS );
+
+        // get our router and query its state...
+        Router router = new Router( ispMonConfig );
+        router.getCurrentISP();
+
+        // get our remote services...
+        // RemoteServices remoteServices = new RemoteServices( ispMonConfig );
 
         // start up our post office...
         po = new PostOffice( config );
@@ -76,9 +83,6 @@ public class ISPMonitor {
         // start up our timer...
         timer = new Timer( "Timer", true );
 
-        // set up our task queue...
-        tasks = new LinkedBlockingQueue<>( MAX_QUEUED_TASKS );
-
         // set up and start our state machine...
         mainStateMachine = new MainSM();
         eventQueue = new EventQueue( mainStateMachine );
@@ -86,18 +90,11 @@ public class ISPMonitor {
         // start up our permanently scheduled tasks...
         DNSTester dnsTester = new DNSTester( timer, ispMonConfig );               // tests whether DNS servers are up for primary and secondary ISPs...
         timer.scheduleAtFixedRate( HEARTBEAT_TASK, HEARTBEAT_MS, HEARTBEAT_MS );  // fixed-rate heartbeat event...
-        POTester poTester = new POTester( ispMonConfig );
+        // POTester poTester = new POTester( ispMonConfig );
 
-        // get the current setting of the default route in the router...
-        ISPUsed isp = router.getCurrentISP();
-
-        // if it's unknown, we have a bad problem and it's time to leave...
-        if( isp == ISPUsed.UNKNOWN ) {
-            LOGGER.severe( "Cannot read the current state of the router; aborting" );
-            System.exit( ROUTER_CONTROL_NOT_WORKING );
-        }
-
-        LOGGER.info( "Router is currently configured to " + isp + " ISP" );
+        // ******* test code ************
+        // remoteServices.stop( "paradise" );
+        // ******************************
 
         try {
             //noinspection InfiniteLoopStatement

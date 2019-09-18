@@ -1,5 +1,6 @@
 package com.dilatush.ispmonitor;
 
+import static com.dilatush.util.General.isNotNull;
 import static com.dilatush.util.General.isNull;
 
 /**
@@ -19,8 +20,23 @@ public class Event {
     }
 
     /* package-private */ Event( final EventType _type, final Object _payload ) {
+
+        if( isNull( _type ) )
+            throw new IllegalArgumentException( "No event type specified" );
+
         type = _type;
         payload = _payload;
+
+        // check to see that our payload is of the right type...
+        if( isNull( payload ) && isNotNull( _type.payloadClass ) )
+            throw new IllegalArgumentException( "Expected " + type.payloadClass.getSimpleName() + " event payload, but got null" );
+        if( isNotNull( payload ) ) {
+            if( isNull( type.payloadClass ) )
+                throw new IllegalArgumentException( "Expected null event payload, but got " + payload.getClass().getSimpleName() );
+            if( !type.payloadClass.isAssignableFrom( payload.getClass() ) )
+                throw new IllegalArgumentException( "Expected " + type.payloadClass.getSimpleName()
+                        + " event payload, but got " + payload.getClass().getSimpleName() );
+        }
     }
 
 

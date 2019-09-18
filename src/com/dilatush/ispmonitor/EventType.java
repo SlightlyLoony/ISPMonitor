@@ -7,16 +7,25 @@ package com.dilatush.ispmonitor;
  */
 public enum EventType {
 
-    Heartbeat,
-    PrimaryISPDNS1State,
-    PrimaryISPDNS2State,
-    SecondaryISPDNS1State,
-    SecondaryISPDNS2State,
-    PrimaryISPRawState,
-    SecondaryISPRawState,
-    PrimaryISPAvailabilityChanged,
-    SecondaryISPAvailabilityChanged,
-    CPOQueryTimeout,
-    POConnected,
-    PODisconnected,
+    Heartbeat                       ( null ),
+    PrimaryISPDNS1State             ( SystemAvailability.class ),
+    PrimaryISPDNS2State             ( SystemAvailability.class ),
+    SecondaryISPDNS1State           ( SystemAvailability.class ),
+    SecondaryISPDNS2State           ( SystemAvailability.class ),
+    PrimaryISPRawState              ( SystemAvailability.class ),
+    SecondaryISPRawState            ( SystemAvailability.class ),
+    PrimaryISPAvailabilityChanged   ( SystemAvailability.class ),
+    SecondaryISPAvailabilityChanged ( SystemAvailability.class ),
+    CPOQueryTimeout                 ( null ),
+    POConnected                     ( null ),
+    PODisconnected                  ( null ),
+    RemoteService                   ( null ),
+    RouterISP                       ( ISPUsed.class ),
+    RouterSet                       ( ISPUsed.class );
+
+    public final Class payloadClass;
+
+    private EventType( final Class _payloadClass ) {
+        payloadClass = _payloadClass;
+    }
 }
