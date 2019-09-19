@@ -17,9 +17,9 @@ public enum EventType {
     PrimaryISPAvailabilityChanged   ( SystemAvailability.class ),
     SecondaryISPAvailabilityChanged ( SystemAvailability.class ),
     CPOQueryTimeout                 ( null ),
-    POConnected                     ( null ),
-    PODisconnected                  ( null ),
-    RemoteService                   ( null ),
+    POConnected                     ( String.class ),   // MOP post office name
+    PODisconnected                  ( String.class ),   // MOP post office name
+    RemoteService                   ( RemoteServices.ServiceActionInfo.class ),
     RouterISP                       ( ISPUsed.class ),
     RouterSet                       ( ISPUsed.class );
 

@@ -56,7 +56,7 @@ public class Router {
             }
         }
         catch( JSONException _je ) {
-            throw new IllegalArgumentException( "Configuration malformed" );
+            throw new IllegalArgumentException( "Configuration malformed", _je );
         }
     }
 

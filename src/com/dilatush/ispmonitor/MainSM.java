@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.*;
 import static com.dilatush.ispmonitor.MainState.*;
+import static com.dilatush.ispmonitor.RemoteServices.*;
 import static com.dilatush.ispmonitor.SystemAvailability.*;
 
 /**
@@ -62,6 +63,7 @@ public class MainSM implements StateMachine<MainState> {
             case PrimaryISPRawState:       handlePrimaryISPRawState(    (SystemAvailability) _event.payload ); break;
             case SecondaryISPRawState:     handleSecondaryISPRawState(  (SystemAvailability) _event.payload ); break;
             case RouterISP:                handleRouterISP(             (ISPUsed)            _event.payload ); break;
+            case RemoteService:            handleRemoteService(         (ServiceActionInfo)  _event.payload ); break;
             default:
                 LOGGER.warning( "Unknown event type (" + _event.type + ") received by state machine; ignoring" );
         }
@@ -72,6 +74,15 @@ public class MainSM implements StateMachine<MainState> {
     public MainState getState() {
         return state;
     }
+
+
+    private void handleRemoteService( final ServiceActionInfo _info ) {
+        if( _info.serviceName.equals( "paradisewww" ) && (_info.action == ServiceAction.STOP) && (_info.result == ServiceActionResult.SUCCESS) ) {
+            RemoteServices remoteServices = ISPMonitor.getRemoteServices();
+            remoteServices.start( remoteServices.byPostOffice( "paradise" ) );
+        }
+    }
+
 
 
     private void handleHeartbeat() {
@@ -110,8 +121,8 @@ public class MainSM implements StateMachine<MainState> {
         SystemAvailability current = priISP.getState();
         priISP.update( _availability );
         if( current != priISP.getState() ) {
-            postEvent( new Event( PrimaryISPAvailabilityChanged, priISP.getState() ) );
             LOGGER.info( "Primary ISP state changed to " + priISP.getState() );
+            postEvent( new Event( PrimaryISPAvailabilityChanged, priISP.getState() ) );
         }
     }
 
@@ -122,8 +133,8 @@ public class MainSM implements StateMachine<MainState> {
         SystemAvailability current = secISP.getState();
         secISP.update( _availability );
         if( current != secISP.getState() ) {
-            postEvent( new Event( SecondaryISPAvailabilityChanged, secISP.getState() ) );
             LOGGER.info( "Secondary ISP state changed to " + secISP.getState() );
+            postEvent( new Event( SecondaryISPAvailabilityChanged, secISP.getState() ) );
         }
     }
 

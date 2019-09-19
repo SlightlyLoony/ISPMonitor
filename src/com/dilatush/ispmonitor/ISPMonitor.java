@@ -34,6 +34,8 @@ public class ISPMonitor {
     private static LinkedBlockingQueue<Task> tasks;
     private static StateMachine              mainStateMachine;
     private static EventQueue                eventQueue;
+    private static Router                    router;
+    private static RemoteServices            remoteServices;
 
 
     public static void main( String[] _args ) throws InterruptedException {
@@ -70,11 +72,11 @@ public class ISPMonitor {
         tasks = new LinkedBlockingQueue<>( MAX_QUEUED_TASKS );
 
         // get our router and query its state...
-        Router router = new Router( ispMonConfig );
+        router = new Router( ispMonConfig );
         router.getCurrentISP();
 
         // get our remote services...
-        // RemoteServices remoteServices = new RemoteServices( ispMonConfig );
+        remoteServices = new RemoteServices( ispMonConfig );
 
         // start up our post office...
         po = new PostOffice( config );
@@ -90,10 +92,10 @@ public class ISPMonitor {
         // start up our permanently scheduled tasks...
         DNSTester dnsTester = new DNSTester( timer, ispMonConfig );               // tests whether DNS servers are up for primary and secondary ISPs...
         timer.scheduleAtFixedRate( HEARTBEAT_TASK, HEARTBEAT_MS, HEARTBEAT_MS );  // fixed-rate heartbeat event...
-        // POTester poTester = new POTester( ispMonConfig );
+        POTester poTester = new POTester( ispMonConfig );
 
         // ******* test code ************
-        // remoteServices.stop( "paradise" );
+        remoteServices.stop( remoteServices.byPostOffice( "paradise" ) );
         // ******************************
 
         try {
@@ -153,4 +155,8 @@ public class ISPMonitor {
     /* package-private */ static Timer getTimer() {
         return timer;
     }
+
+    /* package-private */ static RemoteServices getRemoteServices() {return remoteServices; }
+
+    /* package-private */ static Router getRouter() {return router; }
 }

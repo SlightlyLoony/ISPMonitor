@@ -3,6 +3,8 @@ package com.dilatush.ispmonitor;
 import com.dilatush.mop.Actor;
 import com.dilatush.mop.Message;
 import com.dilatush.util.Config;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Arrays;
@@ -19,23 +21,43 @@ import java.util.logging.Logger;
 public class POTester {
 
     private static final Logger LOGGER           = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
-    private static final long   TEST_INTERVAL_MS = 5000;
-    private static final long   TIMEOUT_MS       = 500;
 
     private static final POTesterActor actor = new POTesterActor();
 
     private final Set<String> postOffices;
+    private final long intervalMS;
+    private final long timeoutMS;
     private TimeoutEvent timeout;
 
 
+    /**
+     * Creates a new instance of {@link POTester} with the specified configuration.
+     *
+     * @param _config the configuration data
+     */
     public POTester( final Config _config ) {
 
-        // get the names of post offices we need to test from our configuration...
-        JSONObject monitoredPostOffices = _config.getJSONObject( "monitoredPostOffices" );
-        postOffices = monitoredPostOffices.keySet();
+        try {
+
+            // get our timing configuration...
+            intervalMS = _config.getLongDotted( "poTests.intervalMS" );
+            timeoutMS  = _config.getLongDotted( "poTests.timeoutMS"  );
+
+            // get the names of post offices we need to test from our configuration...
+            postOffices = new HashSet<>();
+            JSONArray services = _config.getJSONArray( "services" );
+            for( int i = 0; i < services.length(); i++ ) {
+                JSONObject service = services.getJSONObject( i );
+                if( service.has( "postOffice" ) )
+                    postOffices.add( service.getString( "postOffice" ) );
+            }
+        }
+        catch( JSONException _je ) {
+            throw new IllegalArgumentException( "Configuration malformed", _je );
+        }
 
         // schedule our CPO queries...
-        ISPMonitor.getTimer().scheduleAtFixedRate( new RunTests(), TEST_INTERVAL_MS, TEST_INTERVAL_MS );
+        ISPMonitor.getTimer().scheduleAtFixedRate( new RunTests(), intervalMS, intervalMS );
     }
 
 
@@ -52,7 +74,7 @@ public class POTester {
             ISPMonitor.executeTask( () -> actor.mailbox.send( actor.mailbox.createDirectMessage( "central.po", "manage.connected", false ) ) );
 
             // start a timeout event going...
-            timeout = new TimeoutEvent( new Event( EventType.CPOQueryTimeout), TIMEOUT_MS );
+            timeout = new TimeoutEvent( new Event( EventType.CPOQueryTimeout), timeoutMS );
         }
     }
 
