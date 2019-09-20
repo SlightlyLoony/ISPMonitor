@@ -1,8 +1,9 @@
 package com.dilatush.ispmonitor;
 
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static java.util.logging.Level.SEVERE;
 
 /**
  * Implements a simple FIFO queue that accepts new events asynchronously and dispatches them synchronously to a specified state machine in a separate
@@ -43,11 +44,23 @@ public class EventQueue extends Thread {
         try {
             //noinspection InfiniteLoopStatement
             while( true ) {
-                stateMachine.handleEvent( events.take() );
+
+                // we catch everything except InterruptedExceptions and Errors here, log them, then ignore them, so
+                // that we don't terminate this thread (which keeps the entire state machine running)...
+                try {
+                    stateMachine.handleEvent( events.take() );
+                }
+                catch( Exception _e ) {
+
+                    if( _e instanceof InterruptedException )
+                        throw new InterruptedException( _e.getMessage() );
+
+                    LOGGER.log( SEVERE, "Unhandled exception caught by event dispatcher", _e );
+                }
             }
         }
         catch( InterruptedException _e ) {
-            LOGGER.log( Level.SEVERE, "Event queue interrupted", _e );
+            LOGGER.log( SEVERE, "Event queue interrupted", _e );
         }
     }
 

@@ -6,12 +6,11 @@ import com.dilatush.util.Config;
 
 import java.io.File;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.dilatush.ispmonitor.EventType.Heartbeat;
+import static com.dilatush.ispmonitor.EventType.Start;
 import static com.dilatush.util.General.isNotNull;
 
 /**
@@ -21,21 +20,16 @@ import static com.dilatush.util.General.isNotNull;
 public class ISPMonitor {
 
     private static final Logger    LOGGER                     = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
-    private static final int       ROUTER_CONTROL_NOT_WORKING = 1;
+
     private static final int       MAX_QUEUED_TASKS           = 500;
     private static final int       TICKS_PER_SECOND           = 8;
-    private static final Event     HEARTBEAT_EVENT            = new Event( Heartbeat );
-    private static final long      HEARTBEAT_MS               = 1000 / 8;
-    private static final TimerTask HEARTBEAT_TASK             = new TimerTask() { public void run() { ISPMonitor.postEvent( HEARTBEAT_EVENT ); } };
 
     private static PostOffice                po;
     private static Mailbox                   mailbox;
-    private static Timer                     timer;
     private static LinkedBlockingQueue<Task> tasks;
     private static StateMachine              mainStateMachine;
     private static EventQueue                eventQueue;
-    private static Router                    router;
-    private static RemoteServices            remoteServices;
+    private static Timer                     timer;
 
 
     public static void main( String[] _args ) throws InterruptedException {
@@ -46,7 +40,7 @@ public class ISPMonitor {
             Tasks scheduled to execute via the Timer, and event processing within the state machines, should all execute quickly.  That is, they
             should not block, and should not be computationally intensive.  Failing to do this will cause all sorts of nasty timing issues.
 
-            When yo have tasks that are going to take some appreciable time, or that block, the proper mechanism to use is the tasks queue.  You can
+            When you have tasks that are going to take some appreciable time, or that block, the proper mechanism to use is the tasks queue.  You can
             add a task to this queue through the executeTask() method in this class.  The tasks on that queue are executed sequentially in a single
             thread so it's possible that such tasks will be delayed a few seconds or even more.
 
@@ -71,33 +65,19 @@ public class ISPMonitor {
         // set up our task queue...
         tasks = new LinkedBlockingQueue<>( MAX_QUEUED_TASKS );
 
-        // get our router and query its state...
-        router = new Router( ispMonConfig );
-        router.getCurrentISP();
-
-        // get our remote services...
-        remoteServices = new RemoteServices( ispMonConfig );
+        // start up our timer...
+        timer = new Timer( "Timer", true );
 
         // start up our post office...
         po = new PostOffice( config );
         mailbox = po.createMailbox( "ISPMonitor" );
 
-        // start up our timer...
-        timer = new Timer( "Timer", true );
-
         // set up and start our state machine...
-        mainStateMachine = new MainSM();
+        mainStateMachine = new MainSM( ispMonConfig );
         eventQueue = new EventQueue( mainStateMachine );
+        mainStateMachine.postEvent( new Event( Start ) );
 
-        // start up our permanently scheduled tasks...
-        DNSTester dnsTester = new DNSTester( timer, ispMonConfig );               // tests whether DNS servers are up for primary and secondary ISPs...
-        timer.scheduleAtFixedRate( HEARTBEAT_TASK, HEARTBEAT_MS, HEARTBEAT_MS );  // fixed-rate heartbeat event...
-        POTester poTester = new POTester( ispMonConfig );
-
-        // ******* test code ************
-        remoteServices.stop( remoteServices.byPostOffice( "paradise" ) );
-        // ******************************
-
+        // we just loop here forever, executing any tasks that get queued...
         try {
             //noinspection InfiniteLoopStatement
             while( true ) {
@@ -155,8 +135,4 @@ public class ISPMonitor {
     /* package-private */ static Timer getTimer() {
         return timer;
     }
-
-    /* package-private */ static RemoteServices getRemoteServices() {return remoteServices; }
-
-    /* package-private */ static Router getRouter() {return router; }
 }

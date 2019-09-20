@@ -122,6 +122,8 @@ public class Router {
                     if( isNonEmpty( user         ) ) executor.setUser( user );
                     if( isNonEmpty( identityFile ) ) executor.addIdentityFilePath( identityFile );
 
+                    long start = System.currentTimeMillis();
+                    LOGGER.finer( "SSHExecutor about to run \"" + executor + "\"" );
                     executor.start();
 
                     if( executor.waitFor( info.timeoutMS, TimeUnit.MILLISECONDS ) ) {
@@ -130,6 +132,7 @@ public class Router {
                         event = _taskProcessor.process( executor );
 
                     }
+                    LOGGER.finer( "SSH time: " + (System.currentTimeMillis() - start) + "ms" );
                 }
                 catch( IOException | InterruptedException _e ) {
                     // naught to do, as we'll just send the error event...

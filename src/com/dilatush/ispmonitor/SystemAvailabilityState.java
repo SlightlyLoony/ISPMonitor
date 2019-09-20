@@ -75,7 +75,7 @@ public class SystemAvailabilityState {
     public void update( final SystemAvailability _currentState ) {
 
         // if our raw state changes, clear the counters...
-        if( _currentState != rawState ) {
+        if( (_currentState != rawState) || (_currentState == SystemAvailability.UNKNOWN) ) {
             upCount = 0;
             downCount = 0;
         }

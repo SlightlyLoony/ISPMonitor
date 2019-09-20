@@ -28,7 +28,7 @@ public class Event {
         payload = _payload;
 
         // check to see that our payload is of the right type...
-        if( isNull( payload ) && isNotNull( _type.payloadClass ) )
+        if( isNull( payload ) && isNotNull( type.payloadClass ) )
             throw new IllegalArgumentException( "Expected " + type.payloadClass.getSimpleName() + " event payload, but got null" );
         if( isNotNull( payload ) ) {
             if( isNull( type.payloadClass ) )

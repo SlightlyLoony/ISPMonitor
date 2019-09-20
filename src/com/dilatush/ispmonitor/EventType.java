@@ -8,6 +8,7 @@ package com.dilatush.ispmonitor;
 public enum EventType {
 
     Heartbeat                       ( null ),
+    Start                           ( null ),
     PrimaryISPDNS1State             ( SystemAvailability.class ),
     PrimaryISPDNS2State             ( SystemAvailability.class ),
     SecondaryISPDNS1State           ( SystemAvailability.class ),
@@ -19,7 +20,8 @@ public enum EventType {
     CPOQueryTimeout                 ( null ),
     POConnected                     ( String.class ),   // MOP post office name
     PODisconnected                  ( String.class ),   // MOP post office name
-    RemoteService                   ( RemoteServices.ServiceActionInfo.class ),
+    RemoteServiceRaw                ( ServiceActionInfo.class ),
+    RemoteService                   ( SystemAvailability.class ),
     RouterISP                       ( ISPUsed.class ),
     RouterSet                       ( ISPUsed.class );
 

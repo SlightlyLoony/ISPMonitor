@@ -1,15 +1,21 @@
 package com.dilatush.ispmonitor;
 
+import com.dilatush.util.Config;
+
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.*;
-import static com.dilatush.ispmonitor.MainState.*;
-import static com.dilatush.ispmonitor.RemoteServices.*;
+import static com.dilatush.ispmonitor.MainState.INITIAL;
+import static com.dilatush.ispmonitor.RemoteServiceAction.STOP;
+import static com.dilatush.ispmonitor.RemoteServiceActionResult.*;
 import static com.dilatush.ispmonitor.SystemAvailability.*;
 
 /**
- * Implements the state machine that is the heart of ISPMonitor.
+ * Implements the state machine that is the heart of ISPMonitor.  Events are dispatched from a single thread (in an instance of {@link EventQueue}),
+ * so all state changes and inspections occur in the context of that thread &mdash; meaning there should be no concurrency issues in the state
+ * machine.
  *
  * <p>Instances of this class are mutable and <i>not</i> threadsafe.
  *
@@ -17,35 +23,49 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
  */
 public class MainSM implements StateMachine<MainState> {
 
-    private static final Logger LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
-    private static final int    STARTUP_SETTLING_TICKS = ISPMonitor.secondsToTicks( 10 );
+    private static final Logger    LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
+    private static final Event     HEARTBEAT_EVENT        = new Event( Heartbeat );
+    private static final long      HEARTBEAT_MS           = 1000 / 8;
+    private static final TimerTask HEARTBEAT_TASK         = new TimerTask() { public void run() { ISPMonitor.postEvent( HEARTBEAT_EVENT ); } };
 
-    private final SystemAvailabilityState priISPDNS1;
-    private final SystemAvailabilityState priISPDNS2;
-    private final SystemAvailabilityState secISPDNS1;
-    private final SystemAvailabilityState secISPDNS2;
-    private final SystemAvailabilityState priISP;
-    private final SystemAvailabilityState secISP;
+    private final SystemAvailabilityState             priISPDNS1;
+    private final SystemAvailabilityState             priISPDNS2;
+    private final SystemAvailabilityState             secISPDNS1;
+    private final SystemAvailabilityState             secISPDNS2;
+    private final SystemAvailabilityState             priISP;
+    private final SystemAvailabilityState             secISP;
+    private final Config                              config;
+    private final Timer                               timer;
+    private final Map<String,SystemAvailabilityState> servicesState;
 
-    private MainState state;
-    private int       startupSettlingTicks;
+    private MainState       state;
+    private Router          router;
+    private RemoteHosts     hosts;
 
 
-    public MainSM() {
+    public MainSM( final Config _config ) {
+
+        config = _config;
+
+        // just for convenience, get a reference to the timer...
+        timer = ISPMonitor.getTimer();
 
         // set our startup state...
-        state      = STOPPED;
-        priISPDNS1 = new SystemAvailabilityState( UNKNOWN );
-        priISPDNS2 = new SystemAvailabilityState( UNKNOWN );
-        secISPDNS1 = new SystemAvailabilityState( UNKNOWN );
-        secISPDNS2 = new SystemAvailabilityState( UNKNOWN );
-        priISP     = new SystemAvailabilityState( UNKNOWN, 6, 0 );
-        secISP     = new SystemAvailabilityState( UNKNOWN, 6, 0 );
+        state      = INITIAL;
+
+        priISPDNS1    = new SystemAvailabilityState( UNKNOWN );
+        priISPDNS2    = new SystemAvailabilityState( UNKNOWN );
+        secISPDNS1    = new SystemAvailabilityState( UNKNOWN );
+        secISPDNS2    = new SystemAvailabilityState( UNKNOWN );
+        priISP        = new SystemAvailabilityState( UNKNOWN, 6, 0 );
+        secISP        = new SystemAvailabilityState( UNKNOWN, 6, 0 );
+        servicesState = new HashMap<>();
     }
 
 
     /**
-     * The main state machine processing method.
+     * The main state machine event processing method.  Note that this method <i>must</i> be called <i>only</i> from {@link EventQueue#run()};
+     * otherwise there may be concurrency issues.
      *
      * @param _event the event to process
      */
@@ -55,15 +75,16 @@ public class MainSM implements StateMachine<MainState> {
 
         switch( _event.type ) {
 
-            case Heartbeat:                handleHeartbeat();                                                  break;
-            case PrimaryISPDNS1State:      handlePrimaryISPDNS1State(   (SystemAvailability) _event.payload ); break;
-            case PrimaryISPDNS2State:      handlePrimaryISPDNS2State(   (SystemAvailability) _event.payload ); break;
-            case SecondaryISPDNS1State:    handleSecondaryISPDNS1State( (SystemAvailability) _event.payload ); break;
-            case SecondaryISPDNS2State:    handleSecondaryISPDNS2State( (SystemAvailability) _event.payload ); break;
-            case PrimaryISPRawState:       handlePrimaryISPRawState(    (SystemAvailability) _event.payload ); break;
-            case SecondaryISPRawState:     handleSecondaryISPRawState(  (SystemAvailability) _event.payload ); break;
-            case RouterISP:                handleRouterISP(             (ISPUsed)            _event.payload ); break;
-            case RemoteService:            handleRemoteService(         (ServiceActionInfo)  _event.payload ); break;
+            case Heartbeat:                handleHeartbeat();                                                                            break;
+            case Start:                    handleStart();                                                                                break;
+            case RemoteServiceRaw:         handleRemoteServiceRaw(      (ServiceActionInfo)  Objects.requireNonNull( _event.payload ) ); break;
+            case PrimaryISPDNS1State:      handlePrimaryISPDNS1State(   (SystemAvailability) _event.payload );                           break;
+            case PrimaryISPDNS2State:      handlePrimaryISPDNS2State(   (SystemAvailability) _event.payload );                           break;
+            case SecondaryISPDNS1State:    handleSecondaryISPDNS1State( (SystemAvailability) _event.payload );                           break;
+            case SecondaryISPDNS2State:    handleSecondaryISPDNS2State( (SystemAvailability) _event.payload );                           break;
+            case PrimaryISPRawState:       handlePrimaryISPRawState(    (SystemAvailability) _event.payload );                           break;
+            case SecondaryISPRawState:     handleSecondaryISPRawState(  (SystemAvailability) _event.payload );                           break;
+            case RouterISP:                handleRouterISP(             (ISPUsed)            _event.payload );                           break;
             default:
                 LOGGER.warning( "Unknown event type (" + _event.type + ") received by state machine; ignoring" );
         }
@@ -76,37 +97,50 @@ public class MainSM implements StateMachine<MainState> {
     }
 
 
-    private void handleRemoteService( final ServiceActionInfo _info ) {
-        if( _info.serviceName.equals( "paradisewww" ) && (_info.action == ServiceAction.STOP) && (_info.result == ServiceActionResult.SUCCESS) ) {
-            RemoteServices remoteServices = ISPMonitor.getRemoteServices();
-            remoteServices.start( remoteServices.byPostOffice( "paradise" ) );
-        }
+    /**
+     * Handles a {@link EventType#Start} {@link Event}, which should only occur if the state machine is in initial state.
+     */
+    private void handleStart() {
+        // sanity check...
+        if( state != INITIAL )
+            throw new IllegalStateException( "Start event occurred while in " + state + " state, instead of INITIAL state" );
+
+        // get our router and query its state...
+        router = new Router( config );
+        router.getCurrentISP();
+
+        // start up our permanently scheduled tasks...
+        DNSTester dnsTester = new DNSTester( timer, config );                     // tests whether DNS servers are up for primary and secondary ISPs...
+//        timer.scheduleAtFixedRate( HEARTBEAT_TASK, HEARTBEAT_MS, HEARTBEAT_MS );  // fixed-rate heartbeat event...
+//        POTester poTester = new POTester( config );
+
+        // get our remote hosts...
+        hosts = new RemoteHosts( config );
+
+//        // set up our services state map to all in unknown state, with an up delay of zero and a down delay of 2, launch a check...
+//        Collection<ServiceInfo> serviceInfos = hosts.getServices();
+//        for( ServiceInfo serviceInfo : serviceInfos ) {
+//            servicesState.put( serviceInfo.host.hostname + ":" + serviceInfo.serviceName, new SystemAvailabilityState( UNKNOWN, 0, 2 ) );
+//            hosts.check( serviceInfo );
+//        }
     }
 
 
+    private void handleRemoteServiceRaw( final ServiceActionInfo _info ) {
+
+        // update the state of our remote service...
+        SystemAvailabilityState serviceState = servicesState.get( _info.hostName + ":" + _info.serviceName );
+        if( (_info.result == ERROR) || (_info.result == TIMEOUT) )
+            serviceState.update( UNKNOWN );
+        if( _info.action != STOP )
+            serviceState.update( (_info.result == SUCCESS) ? UP   : DOWN );
+        else
+            serviceState.update( (_info.result == SUCCESS) ? DOWN : UP   );
+    }
+
 
     private void handleHeartbeat() {
-
-        // if we're stopped, see if it's time to be running (known ISP state for STARTUP_SETTLING_SECONDS)...
-        if( state == STOPPED ) {
-
-            // if we know the state of our ISPs...
-            if( (priISP.getState() != UNKNOWN) && (secISP.getState() != UNKNOWN) ) {
-
-                // if we've had known ISP state's for our settling period...
-                if( ++startupSettlingTicks >= STARTUP_SETTLING_TICKS ) {
-
-                    // change our state to running...
-                    state = RUNNING;
-                    LOGGER.info( "Main state machine is now RUNNING" );
-                }
-            }
-
-            // clear our settling period counter...
-            else {
-                startupSettlingTicks = 0;
-            }
-        }
+        LOGGER.info( "WWW: " + servicesState.get( "paradise.dilatush.com:paradisewww" ).getState() );
     }
 
 
