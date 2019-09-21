@@ -64,6 +64,11 @@ import java.util.logging.Logger;
     }
 
 
+    /* package-private */ void serviceStateChanged() {
+
+    }
+
+
     /**
      * Returns the instance of {@link RemoteService} that represents the service on this host with the specified systemd name, or {@code null} if
      * there is no service by that name configured on this host.

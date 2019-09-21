@@ -2,14 +2,15 @@ package com.dilatush.ispmonitor;
 
 import com.dilatush.util.Config;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.*;
 import static com.dilatush.ispmonitor.MainState.INITIAL;
-import static com.dilatush.ispmonitor.RemoteServiceAction.STOP;
-import static com.dilatush.ispmonitor.RemoteServiceActionResult.*;
 import static com.dilatush.ispmonitor.SystemAvailability.*;
 
 /**
@@ -77,7 +78,7 @@ public class MainSM implements StateMachine<MainState> {
 
             case Heartbeat:                handleHeartbeat();                                                                            break;
             case Start:                    handleStart();                                                                                break;
-            case RemoteServiceRaw:         handleRemoteServiceRaw(      (ServiceActionInfo)  Objects.requireNonNull( _event.payload ) ); break;
+            case SSHResult:                handleSSHResult(             (SSHResult)          _event.payload );                           break;
             case PrimaryISPDNS1State:      handlePrimaryISPDNS1State(   (SystemAvailability) _event.payload );                           break;
             case PrimaryISPDNS2State:      handlePrimaryISPDNS2State(   (SystemAvailability) _event.payload );                           break;
             case SecondaryISPDNS1State:    handleSecondaryISPDNS1State( (SystemAvailability) _event.payload );                           break;
@@ -101,6 +102,7 @@ public class MainSM implements StateMachine<MainState> {
      * Handles a {@link EventType#Start} {@link Event}, which should only occur if the state machine is in initial state.
      */
     private void handleStart() {
+
         // sanity check...
         if( state != INITIAL )
             throw new IllegalStateException( "Start event occurred while in " + state + " state, instead of INITIAL state" );
@@ -117,6 +119,10 @@ public class MainSM implements StateMachine<MainState> {
         // get our remote hosts...
         hosts = new RemoteHosts( config );
 
+        // test code //
+        hosts.getServiceUsingPostOffice( "paradise" ).check();
+        ///////////////
+
 //        // set up our services state map to all in unknown state, with an up delay of zero and a down delay of 2, launch a check...
 //        Collection<ServiceInfo> serviceInfos = hosts.getServices();
 //        for( ServiceInfo serviceInfo : serviceInfos ) {
@@ -126,16 +132,9 @@ public class MainSM implements StateMachine<MainState> {
     }
 
 
-    private void handleRemoteServiceRaw( final ServiceActionInfo _info ) {
-
-        // update the state of our remote service...
-        SystemAvailabilityState serviceState = servicesState.get( _info.hostName + ":" + _info.serviceName );
-        if( (_info.result == ERROR) || (_info.result == TIMEOUT) )
-            serviceState.update( UNKNOWN );
-        if( _info.action != STOP )
-            serviceState.update( (_info.result == SUCCESS) ? UP   : DOWN );
-        else
-            serviceState.update( (_info.result == SUCCESS) ? DOWN : UP   );
+    private void handleSSHResult( final SSHResult _sshResult ) {
+        _sshResult.handler.handle( _sshResult );
+        hashCode();
     }
 
 

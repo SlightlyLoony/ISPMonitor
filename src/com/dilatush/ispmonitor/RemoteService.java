@@ -1,20 +1,13 @@
 package com.dilatush.ispmonitor;
 
-import com.dilatush.util.SSHExecutor;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import static com.dilatush.ispmonitor.RemoteServiceAction.*;
-import static com.dilatush.ispmonitor.RemoteServiceActionResult.*;
-import static com.dilatush.util.General.isNotNull;
-import static com.dilatush.util.General.isNull;
-import static com.dilatush.util.Strings.stripTrailingNewlines;
+import static com.dilatush.ispmonitor.SystemAvailability.*;
 
 /**
  * Contains information about a systemd service running on a remote host, as configured in the configuration file.
@@ -29,6 +22,8 @@ import static com.dilatush.util.Strings.stripTrailingNewlines;
     private final String                     name;      // the systemd name of this service...
     private final String                     po;        // the MOP post office used by this service, or null if it doesn't use a post office at all...
     private final Map<String, Command>       commands;  // key is the command's name...
+
+    private       SystemAvailability         state;     // the current state of this service...
 
 
     /**
@@ -56,6 +51,8 @@ import static com.dilatush.util.Strings.stripTrailingNewlines;
                 commands.put( commandObj.getString( "name" ), new Command( commandObj ) );
             }
         }
+
+        state = UNKNOWN;
     }
 
 
@@ -91,89 +88,91 @@ import static com.dilatush.util.Strings.stripTrailingNewlines;
 
     /**
      * Runs a command on the server (via SSH) hosting the specified systemd service that will stop that service.  This job is queued and may not
-     * execute immediately.  Upon completion, a {@link EventType#RemoteServiceRaw} is dispatched, with a payload of {@link ServiceActionInfo} that
-     * describes the result.
+     * execute immediately.  Upon completion, a {@link EventType#SSHResult} event is dispatched, with a payload of {@link SSHResult} that describes
+     * the result.  The event handler calls {@link #handleStop(SSHResult)} to process the result.
      */
     /* package-private */ void stop() {
-        createTask( commands.get( "stop" ), STOP );
+        ISPMonitor.executeTask( new SSHTask( this::handleStop, host, commands.get( "stop" ) ) );
+    }
+
+
+    private void handleStop( final SSHResult _result ) {
+        analyzeSSHResult( _result, DOWN );
     }
 
 
     /**
      * Runs a command on the server (via SSH) hosting the specified systemd service that will start that service.  This job is queued and may not
-     * execute immediately.  Upon completion, a {@link EventType#RemoteServiceRaw} is dispatched, with a payload of {@link ServiceActionInfo} that
-     * describes the result.
+     * execute immediately.  Upon completion, a {@link EventType#SSHResult} event is dispatched, with a payload of {@link SSHResult} that describes
+     * the result.  The event handler calls {@link #handleStart(SSHResult)} to process the result.
      */
     /* package-private */ void start() {
-        createTask( commands.get( "start" ), START );
+        ISPMonitor.executeTask( new SSHTask( this::handleStart, host, commands.get( "start" ) ) );
+    }
+
+
+    private void handleStart( final SSHResult _result ) {
+        analyzeSSHResult( _result, UP );
     }
 
 
     /**
      * Runs a command on the server (via SSH) hosting the specified systemd service that will restart that service.  This job is queued and may not
-     * execute immediately.  Upon completion, a {@link EventType#RemoteServiceRaw} is dispatched, with a payload of {@link ServiceActionInfo} that
-     * describes the result.
+     * execute immediately.  Upon completion, a {@link EventType#SSHResult} event is dispatched, with a payload of {@link SSHResult} that describes
+     * the result.  The event handler calls {@link #handleRestart(SSHResult)} to process the result.
      */
     /* package-private */ void restart() {
-        createTask( commands.get( "restart" ), RESTART );
+        ISPMonitor.executeTask( new SSHTask( this::handleRestart, host, commands.get( "restart" ) ) );
+    }
+
+
+    private void handleRestart( final SSHResult _result ) {
+        analyzeSSHResult( _result, UP );
     }
 
 
     /**
      * Runs a command on the server (via SSH) hosting the specified systemd service that will check that service to see if it is active.  This job is
-     * queued and may not execute immediately.  Upon completion, a {@link EventType#RemoteServiceRaw} is dispatched, with a payload of
-     * {@link ServiceActionInfo} that describes the result.
+     * queued and may not execute immediately.  Upon completion, a {@link EventType#SSHResult} event is dispatched, with a payload of
+     * {@link SSHResult} that describes the result.  The event handler calls {@link #handleCheck(SSHResult)} to process the result.
      */
     /* package-private */ void check() {
-        createTask( commands.get( "check" ), CHECK );
+        ISPMonitor.executeTask( new SSHTask( this::handleCheck, host, commands.get( "check" ) ) );
     }
 
 
-    /**
-     * Creates and queues a task to run a command on a remote server via SSH.  The command and the event it generates are controlled by the specified
-     * service information, command string, service action, and expected result.
-     *
-     * @param _command the command string
-     * @param _action the action being taken
-     */
-    private void createTask( final Command _command, final RemoteServiceAction _action ) {
+    private void handleCheck( final SSHResult _result ) {
+        analyzeSSHResult( _result, UP );
+    }
 
-        if( isNull( _command ) )
-            throw new IllegalArgumentException( "Command not specified" );
 
-        ISPMonitor.executeTask( () -> {
+    private void analyzeSSHResult( final SSHResult _result, final SystemAvailability _expected ) {
 
-            RemoteServiceActionResult result;
+        // if the command completed, then analyze the results...
+        if( _result.type == SSHResultType.COMPLETED ) {
 
-            try {
-                SSHExecutor executor = new SSHExecutor( host.getHostname(), _command.command );
-                if( isNotNull( host.getUser() ) )
-                    executor.setUser( host.getUser() );
-                if( isNotNull( host.getIdentityFile() ) )
-                    executor.addIdentityFilePath( host.getIdentityFile() );
-                long start = System.currentTimeMillis();
-                LOGGER.finer( "SSHExecutor about to run \"" + executor + "\"" );
-                executor.start();
-                if( executor.waitFor( _command.timeoutMS, TimeUnit.MILLISECONDS ) ) {
+            // if we got the expected output, then our service has the expected availability...
+            if( _result.command.expectedResponse.equals( _result.output ) )
+                setState( _expected );
 
-                    // if we get here, the job completed normally - gather info with the results...
-                    String output = stripTrailingNewlines( executor.getRemoteOutput() );
-                    LOGGER.finer( "Output: " + output );
-                    boolean success = _command.expectedResponse.equals( output );
-                    result = success ? SUCCESS : FAILURE;
-                }
-                else
-                    result = TIMEOUT;
-                LOGGER.finer( "SSH time: " + (System.currentTimeMillis() - start) + "ms" );
-            }
-            catch( IOException | InterruptedException _e ) {
-                result = ERROR;
-            }
+                // but if we got something unexpected, then our service has the unexpected availability...
+            else
+                setState( (_expected == UP) ? DOWN : UP );
+        }
 
-            // send an event with our results...
-            Event event = new Event( EventType.RemoteServiceRaw,
-                                     new ServiceActionInfo( host.getHostname(), name, _action, result ) );
-            ISPMonitor.postEvent( event );
-        } );
+        // otherwise the command had a problem executing, and our state is unknown...
+        else
+            setState( UNKNOWN );
+    }
+
+
+    private void setState( final SystemAvailability _newState ) {
+
+        // if the state isn't changing, then there's naught to do...
+        if( _newState == state )
+            return;
+
+        state = _newState;
+        host.serviceStateChanged();  // notify the host object that we've changed...
     }
 }

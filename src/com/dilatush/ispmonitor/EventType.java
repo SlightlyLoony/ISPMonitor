@@ -9,6 +9,7 @@ public enum EventType {
 
     Heartbeat                       ( null ),
     Start                           ( null ),
+    SSHResult                       ( SSHResult.class ),
     PrimaryISPDNS1State             ( SystemAvailability.class ),
     PrimaryISPDNS2State             ( SystemAvailability.class ),
     SecondaryISPDNS1State           ( SystemAvailability.class ),
@@ -20,8 +21,6 @@ public enum EventType {
     CPOQueryTimeout                 ( null ),
     POConnected                     ( String.class ),   // MOP post office name
     PODisconnected                  ( String.class ),   // MOP post office name
-    RemoteServiceRaw                ( ServiceActionInfo.class ),
-    RemoteService                   ( SystemAvailability.class ),
     RouterISP                       ( ISPUsed.class ),
     RouterSet                       ( ISPUsed.class );
 
