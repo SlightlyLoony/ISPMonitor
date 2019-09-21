@@ -6,7 +6,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import static com.dilatush.util.General.isNotNull;
@@ -54,6 +56,11 @@ import static com.dilatush.util.General.isNotNull;
                 }
             }
         }
+    }
+
+
+    /* package-private */ Set<RemoteService> getServicesUsingPostOffice() {
+        return new HashSet<>( servicesByPO.values() );
     }
 
 

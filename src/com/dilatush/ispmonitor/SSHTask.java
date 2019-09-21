@@ -18,14 +18,18 @@ public class SSHTask implements Task {
     private static final Logger LOGGER = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
 
     private final SSHResultHandler handler;
-    private final RemoteHost       host;
     private final Command          command;
+    private final String           hostname;
+    private final String           user;
+    private final String           identityFile;
 
 
-    public SSHTask( final SSHResultHandler _handler, final RemoteHost _host, final Command _command ) {
-        handler = _handler;
-        host = _host;
-        command = _command;
+    public SSHTask( final SSHResultHandler _handler, final String _hostname, final String _user, final String _identityFile, final Command _command ) {
+        handler      = _handler;
+        command      = _command;
+        hostname     = _hostname;
+        user         = _user;
+        identityFile = _identityFile;
     }
 
 
@@ -37,11 +41,11 @@ public class SSHTask implements Task {
         String        output = null;
 
         try {
-            SSHExecutor executor = new SSHExecutor( host.getHostname(), command.command );
-            if( isNotNull( host.getUser() ) )
-                executor.setUser( host.getUser() );
-            if( isNotNull( host.getIdentityFile() ) )
-                executor.addIdentityFilePath( host.getIdentityFile() );
+            SSHExecutor executor = new SSHExecutor( hostname, command.command );
+            if( isNotNull( user ) )
+                executor.setUser( user );
+            if( isNotNull( identityFile ) )
+                executor.addIdentityFilePath( identityFile );
             long start = System.currentTimeMillis();
             LOGGER.finer( "SSHExecutor about to run \"" + executor + "\"" );
             executor.start();

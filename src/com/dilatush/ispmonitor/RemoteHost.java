@@ -43,14 +43,7 @@ import java.util.logging.Logger;
         tunnel = _config.has( "tunnel" ) ? new SSHTunnel( _config.getJSONObject( "tunnel" ) ) : null;
 
         // get any commands we might have...
-        commands = new HashMap<>();
-        if( _config.has( "commands" ) ) {
-            JSONArray commandArray = _config.getJSONArray( "commands" );
-            for( int i = 0; i < commandArray.length(); i++ ) {
-                JSONObject commandObj = commandArray.getJSONObject( i );
-                commands.put( commandObj.getString( "name" ), new Command( commandObj ) );
-            }
-        }
+        commands = Command.getCommands( _config, "commands" );
 
         // get any services we might have...
         services = new HashMap<>();
@@ -65,7 +58,12 @@ import java.util.logging.Logger;
 
 
     /* package-private */ void serviceStateChanged() {
+        LOGGER.info( "Service state changed" );
+    }
 
+
+    /* package-private */ void postOfficeStateChanged() {
+        LOGGER.info( "Post office connection state changed" );
     }
 
 

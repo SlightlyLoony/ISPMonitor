@@ -1,17 +1,19 @@
 package com.dilatush.ispmonitor;
 
-import com.dilatush.mop.Actor;
+import com.dilatush.mop.Mailbox;
 import com.dilatush.mop.Message;
 import com.dilatush.util.Config;
-import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+
+import static com.dilatush.ispmonitor.SystemAvailability.DOWN;
+import static com.dilatush.ispmonitor.SystemAvailability.UP;
 
 /**
  * Implements a test for connectivity of monitored MOP applications to the Central Post Office.
@@ -22,11 +24,12 @@ public class POTester {
 
     private static final Logger LOGGER           = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
 
-    private static final POTesterActor actor = new POTesterActor();
-
     private final Set<String> postOffices;
-    private final long intervalMS;
-    private final long timeoutMS;
+    private final long        intervalMS;
+    private final long        timeoutMS;
+    private final Mailbox     mailbox;
+    private final RemoteHosts hosts;
+
     private TimeoutEvent timeout;
 
 
@@ -35,25 +38,27 @@ public class POTester {
      *
      * @param _config the configuration data
      */
-    public POTester( final Config _config ) {
+    public POTester( final Config _config, final RemoteHosts _hosts, final Mailbox _mailbox ) {
+
+        // the basics...
+        mailbox = _mailbox;
+        hosts   = _hosts;
 
         try {
 
             // get our timing configuration...
             intervalMS = _config.getLongDotted( "poTests.intervalMS" );
             timeoutMS  = _config.getLongDotted( "poTests.timeoutMS"  );
-
-            // get the names of post offices we need to test from our configuration...
-            postOffices = new HashSet<>();
-            JSONArray services = _config.getJSONArray( "services" );
-            for( int i = 0; i < services.length(); i++ ) {
-                JSONObject service = services.getJSONObject( i );
-                if( service.has( "postOffice" ) )
-                    postOffices.add( service.getString( "postOffice" ) );
-            }
         }
         catch( JSONException _je ) {
             throw new IllegalArgumentException( "Configuration malformed", _je );
+        }
+
+        // get the names of post offices we need to test from our configuration...
+        postOffices = new HashSet<>();
+        Set<RemoteService> services = hosts.getServicesUsingPostOffice();
+        for( RemoteService service : services ) {
+            postOffices.add( service.getPostOffice() );
         }
 
         // schedule our CPO queries...
@@ -70,43 +75,38 @@ public class POTester {
         public void run() {
 
             // start the tests...
-            actor.tester = POTester.this;
-            ISPMonitor.executeTask( () -> actor.mailbox.send( actor.mailbox.createDirectMessage( "central.po", "manage.connected", false ) ) );
+            ISPMonitor.executeTask( () -> {
 
-            // start a timeout event going...
-            timeout = new TimeoutEvent( new Event( EventType.CPOQueryTimeout), timeoutMS );
-        }
-    }
+                // send the query to the central post office...
+                mailbox.send( mailbox.createDirectMessage( "central.po", "manage.connected", false ) );
 
+                try {
 
-    private static class POTesterActor extends Actor {
+                    // wait for a response, for a limited time...
+                    Message response = mailbox.poll( timeoutMS, TimeUnit.MILLISECONDS );
 
-        private volatile POTester tester;
+                    // make sure we got the right message...
+                    if( "central.po".equals( response.from) && "manage.connected".equals( response.type) ) {
 
-        /* package-private */ POTesterActor() {
-            super( ISPMonitor.getPostOffice(), "POTester" );
-            registerFQDirectMessageHandler( this::connectedHandler, "central.po", "manage", "connected" );
-        }
+                        // get the connected post offices...
+                        String connectedPOs = response.getString( "postOffices" );
 
+                        LOGGER.fine( "Connected Post Offices: " + connectedPOs );
 
-        /* package-private */ void connectedHandler( final Message _message ) {
+                        // analyze the connected post offices we just received, versus the ones we're monitoring...
+                        Set<String> connectedPostOffices = new HashSet<>( Arrays.asList( connectedPOs.split( "," ) ) );
+                        for( String monitoredPO : postOffices ) {
 
-            // make sure we beat the timeout...
-            if( tester.timeout.complete() ) {
-
-                // extract our information...
-                String connectedPOs = _message.getString( "postOffices" );
-
-                LOGGER.info( "Post Offices: " + connectedPOs );
-
-                // analyze the connected post offices we just received, versus the ones we're monitoring...
-                Set<String> connectedPostOffices = new HashSet<>( Arrays.asList( connectedPOs.split( "," ) ) );
-                for( String monitoredPO : tester.postOffices ) {
-
-                    boolean isConnected = connectedPostOffices.contains( monitoredPO );
-                    ISPMonitor.postEvent( new Event( isConnected ? EventType.POConnected : EventType.PODisconnected, monitoredPO ) );
+                            // send an event describing the result...
+                            SystemAvailability sa = connectedPostOffices.contains( monitoredPO ) ? UP : DOWN;
+                            ISPMonitor.postEvent( new Event( EventType.PostOfficeTest, new POTestResult( sa, monitoredPO ) ) );
+                        }
+                    }
                 }
-            }
+                catch( InterruptedException _ie ) {
+                    LOGGER.warning( "Post office query task interrupted" );
+                }
+            } );
         }
     }
 }

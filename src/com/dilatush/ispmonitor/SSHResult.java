@@ -22,6 +22,6 @@ public class SSHResult {
 
 
     public String toString() {
-        return "SSHResult: " + type + ", exit code: " + exitCode + "; output: " + output;
+        return type + ", exit code: " + exitCode + "; output: " + output;
     }
 }

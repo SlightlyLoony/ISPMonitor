@@ -1,9 +1,7 @@
 package com.dilatush.ispmonitor;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -24,6 +22,7 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
     private final Map<String, Command>       commands;  // key is the command's name...
 
     private       SystemAvailability         state;     // the current state of this service...
+    private       SystemAvailability         poState;   // the current state of the post office associated with this service (unknown if none)...
 
 
     /**
@@ -43,16 +42,10 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
         po = _config.has( "postOffice" ) ? _config.getString( "postOffice" ) : null;
 
         // get any commands we might have...
-        commands = new HashMap<>();
-        if( _config.has( "commands" ) ) {
-            JSONArray commandArray = _config.getJSONArray( "commands" );
-            for( int i = 0; i < commandArray.length(); i++ ) {
-                JSONObject commandObj = commandArray.getJSONObject( i );
-                commands.put( commandObj.getString( "name" ), new Command( commandObj ) );
-            }
-        }
+        commands = Command.getCommands( _config, "commands" );
 
         state = UNKNOWN;
+        poState = UNKNOWN;
     }
 
 
@@ -86,13 +79,27 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
     }
 
 
+    /* package-private */ void updatePostOfficeAvailability( final SystemAvailability _poAvailability ) {
+
+        // if our new state is different than the previous state...
+        if( _poAvailability != poState ) {
+
+            // update it...
+            poState = _poAvailability;
+
+            // let the host know...
+            host.postOfficeStateChanged();
+        }
+    }
+
+
     /**
      * Runs a command on the server (via SSH) hosting the specified systemd service that will stop that service.  This job is queued and may not
      * execute immediately.  Upon completion, a {@link EventType#SSHResult} event is dispatched, with a payload of {@link SSHResult} that describes
      * the result.  The event handler calls {@link #handleStop(SSHResult)} to process the result.
      */
     /* package-private */ void stop() {
-        ISPMonitor.executeTask( new SSHTask( this::handleStop, host, commands.get( "stop" ) ) );
+        ISPMonitor.executeTask( new SSHTask( this::handleStop, host.getHostname(), host.getUser(), host.getIdentityFile(), commands.get( "stop" ) ) );
     }
 
 
@@ -107,7 +114,7 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
      * the result.  The event handler calls {@link #handleStart(SSHResult)} to process the result.
      */
     /* package-private */ void start() {
-        ISPMonitor.executeTask( new SSHTask( this::handleStart, host, commands.get( "start" ) ) );
+        ISPMonitor.executeTask( new SSHTask( this::handleStart, host.getHostname(), host.getUser(), host.getIdentityFile(), commands.get( "start" ) ) );
     }
 
 
@@ -122,7 +129,7 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
      * the result.  The event handler calls {@link #handleRestart(SSHResult)} to process the result.
      */
     /* package-private */ void restart() {
-        ISPMonitor.executeTask( new SSHTask( this::handleRestart, host, commands.get( "restart" ) ) );
+        ISPMonitor.executeTask( new SSHTask( this::handleRestart, host.getHostname(), host.getUser(), host.getIdentityFile(), commands.get( "restart" ) ) );
     }
 
 
@@ -137,7 +144,7 @@ import static com.dilatush.ispmonitor.SystemAvailability.*;
      * {@link SSHResult} that describes the result.  The event handler calls {@link #handleCheck(SSHResult)} to process the result.
      */
     /* package-private */ void check() {
-        ISPMonitor.executeTask( new SSHTask( this::handleCheck, host, commands.get( "check" ) ) );
+        ISPMonitor.executeTask( new SSHTask( this::handleCheck, host.getHostname(), host.getUser(), host.getIdentityFile(), commands.get( "check" ) ) );
     }
 
 

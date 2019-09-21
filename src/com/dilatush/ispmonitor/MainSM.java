@@ -1,17 +1,15 @@
 package com.dilatush.ispmonitor;
 
+import com.dilatush.mop.Mailbox;
 import com.dilatush.util.Config;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.dilatush.ispmonitor.EventType.*;
+import static com.dilatush.ispmonitor.EventType.Heartbeat;
 import static com.dilatush.ispmonitor.MainState.INITIAL;
-import static com.dilatush.ispmonitor.SystemAvailability.*;
 
 /**
  * Implements the state machine that is the heart of ISPMonitor.  Events are dispatched from a single thread (in an instance of {@link EventQueue}),
@@ -27,21 +25,16 @@ public class MainSM implements StateMachine<MainState> {
     private static final Logger    LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
     private static final Event     HEARTBEAT_EVENT        = new Event( Heartbeat );
     private static final long      HEARTBEAT_MS           = 1000 / 8;
-    private static final TimerTask HEARTBEAT_TASK         = new TimerTask() { public void run() { ISPMonitor.postEvent( HEARTBEAT_EVENT ); } };
+    private static final TimerTask HEARTBEAT_TIMER_TASK   = new TimerTask() { public void run() { ISPMonitor.postEvent( HEARTBEAT_EVENT ); } };
 
-    private final SystemAvailabilityState             priISPDNS1;
-    private final SystemAvailabilityState             priISPDNS2;
-    private final SystemAvailabilityState             secISPDNS1;
-    private final SystemAvailabilityState             secISPDNS2;
-    private final SystemAvailabilityState             priISP;
-    private final SystemAvailabilityState             secISP;
     private final Config                              config;
     private final Timer                               timer;
-    private final Map<String,SystemAvailabilityState> servicesState;
+    private final Mailbox                             mailbox;
 
     private MainState       state;
-    private Router          router;
+    private EdgeRouter      edgeRouter;
     private RemoteHosts     hosts;
+    private POTester        poTester;
 
 
     public MainSM( final Config _config ) {
@@ -53,14 +46,7 @@ public class MainSM implements StateMachine<MainState> {
 
         // set our startup state...
         state      = INITIAL;
-
-        priISPDNS1    = new SystemAvailabilityState( UNKNOWN );
-        priISPDNS2    = new SystemAvailabilityState( UNKNOWN );
-        secISPDNS1    = new SystemAvailabilityState( UNKNOWN );
-        secISPDNS2    = new SystemAvailabilityState( UNKNOWN );
-        priISP        = new SystemAvailabilityState( UNKNOWN, 6, 0 );
-        secISP        = new SystemAvailabilityState( UNKNOWN, 6, 0 );
-        servicesState = new HashMap<>();
+        mailbox    = ISPMonitor.getPostOffice().createMailbox( "test" );  // get our special testing mailbox...
     }
 
 
@@ -79,13 +65,10 @@ public class MainSM implements StateMachine<MainState> {
             case Heartbeat:                handleHeartbeat();                                                                            break;
             case Start:                    handleStart();                                                                                break;
             case SSHResult:                handleSSHResult(             (SSHResult)          _event.payload );                           break;
-            case PrimaryISPDNS1State:      handlePrimaryISPDNS1State(   (SystemAvailability) _event.payload );                           break;
-            case PrimaryISPDNS2State:      handlePrimaryISPDNS2State(   (SystemAvailability) _event.payload );                           break;
-            case SecondaryISPDNS1State:    handleSecondaryISPDNS1State( (SystemAvailability) _event.payload );                           break;
-            case SecondaryISPDNS2State:    handleSecondaryISPDNS2State( (SystemAvailability) _event.payload );                           break;
-            case PrimaryISPRawState:       handlePrimaryISPRawState(    (SystemAvailability) _event.payload );                           break;
-            case SecondaryISPRawState:     handleSecondaryISPRawState(  (SystemAvailability) _event.payload );                           break;
-            case RouterISP:                handleRouterISP(             (ISPUsed)            _event.payload );                           break;
+            case DNSResult:                handleDNSResult(             (DNSResult)          _event.payload );                           break;
+            case RouterISP:                handleRouterISP(             (ISPChoice)          _event.payload );                           break;
+            case PostOfficeTest:           handlePostOfficeTest(        (POTestResult)       _event.payload );                           break;
+
             default:
                 LOGGER.warning( "Unknown event type (" + _event.type + ") received by state machine; ignoring" );
         }
@@ -107,28 +90,23 @@ public class MainSM implements StateMachine<MainState> {
         if( state != INITIAL )
             throw new IllegalStateException( "Start event occurred while in " + state + " state, instead of INITIAL state" );
 
-        // get our router and query its state...
-        router = new Router( config );
-        router.getCurrentISP();
-
-        // start up our permanently scheduled tasks...
-        DNSTester dnsTester = new DNSTester( timer, config );                     // tests whether DNS servers are up for primary and secondary ISPs...
-//        timer.scheduleAtFixedRate( HEARTBEAT_TASK, HEARTBEAT_MS, HEARTBEAT_MS );  // fixed-rate heartbeat event...
-//        POTester poTester = new POTester( config );
+        // get our edge router and query its state...
+        edgeRouter = new EdgeRouter( config );
+        edgeRouter.getCurrentISP();
 
         // get our remote hosts...
         hosts = new RemoteHosts( config );
 
-        // test code //
-        hosts.getServiceUsingPostOffice( "paradise" ).check();
-        ///////////////
+        // start up our post office tester...
+        POTester poTester = new POTester( config, hosts, mailbox );
 
-//        // set up our services state map to all in unknown state, with an up delay of zero and a down delay of 2, launch a check...
-//        Collection<ServiceInfo> serviceInfos = hosts.getServices();
-//        for( ServiceInfo serviceInfo : serviceInfos ) {
-//            servicesState.put( serviceInfo.host.hostname + ":" + serviceInfo.serviceName, new SystemAvailabilityState( UNKNOWN, 0, 2 ) );
-//            hosts.check( serviceInfo );
-//        }
+        // start our heartbeat...
+        ISPMonitor.getTimer().scheduleAtFixedRate( HEARTBEAT_TIMER_TASK, HEARTBEAT_MS, HEARTBEAT_MS );
+    }
+
+
+    private void handlePostOfficeTest( final POTestResult _poTestResult ) {
+        hosts.getServiceUsingPostOffice( _poTestResult.postOffice ).updatePostOfficeAvailability( _poTestResult.availability );
     }
 
 
@@ -138,76 +116,24 @@ public class MainSM implements StateMachine<MainState> {
     }
 
 
+    private void handleDNSResult( final DNSResult _dnsResult ) {
+        _dnsResult.handler.handle( _dnsResult );
+        hashCode();
+    }
+
+
     private void handleHeartbeat() {
-        LOGGER.info( "WWW: " + servicesState.get( "paradise.dilatush.com:paradisewww" ).getState() );
+
+        edgeRouter.heartbeat();
     }
 
 
-    private void handleRouterISP( final ISPUsed _ispUsed ) {
+    private void handleRouterISP( final ISPChoice _ispChoice ) {
 
     }
 
 
-    private void handlePrimaryISPRawState( final SystemAvailability _availability ) {
-
-        // post an event if our state changed...
-        SystemAvailability current = priISP.getState();
-        priISP.update( _availability );
-        if( current != priISP.getState() ) {
-            LOGGER.info( "Primary ISP state changed to " + priISP.getState() );
-            postEvent( new Event( PrimaryISPAvailabilityChanged, priISP.getState() ) );
-        }
-    }
-
-
-    private void handleSecondaryISPRawState( final SystemAvailability _availability ) {
-
-        // post an event if our state changed...
-        SystemAvailability current = secISP.getState();
-        secISP.update( _availability );
-        if( current != secISP.getState() ) {
-            LOGGER.info( "Secondary ISP state changed to " + secISP.getState() );
-            postEvent( new Event( SecondaryISPAvailabilityChanged, secISP.getState() ) );
-        }
-    }
-
-
-    private void handlePrimaryISPDNS1State( final SystemAvailability _availability ) {
-        priISPDNS1.update( _availability );
-        determinePriDNSState();
-    }
-
-
-    private void handlePrimaryISPDNS2State( final SystemAvailability _availability ) {
-        priISPDNS2.update( _availability );
-        determinePriDNSState();
-    }
-
-
-    private void determinePriDNSState() {
-        if( (priISPDNS1.getState() == UP) || (priISPDNS2.getState() == UP) )
-            postEvent( new Event( PrimaryISPRawState, UP ) );
-        else
-            postEvent( new Event( PrimaryISPRawState, DOWN ) );
-    }
-
-
-    private void handleSecondaryISPDNS1State( final SystemAvailability _availability ) {
-        secISPDNS1.update( _availability );
-        determineSecDNSState();
-    }
-
-
-    private void handleSecondaryISPDNS2State( final SystemAvailability _availability ) {
-        secISPDNS2.update( _availability );
-        determineSecDNSState();
-    }
-
-
-    private void determineSecDNSState() {
-        if( (secISPDNS1.getState() == UP) || (secISPDNS2.getState() == UP) )
-            postEvent( new Event( SecondaryISPRawState, UP ) );
-        else
-            postEvent( new Event( SecondaryISPRawState, DOWN ) );
+    /* package-private */ void executeTask( final Task _task ) {
+        ISPMonitor.executeTask( _task );
     }
 }
