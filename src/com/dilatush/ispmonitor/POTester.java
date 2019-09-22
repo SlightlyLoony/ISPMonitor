@@ -30,8 +30,6 @@ public class POTester {
     private final Mailbox     mailbox;
     private final RemoteHosts hosts;
 
-    private TimeoutEvent timeout;
-
 
     /**
      * Creates a new instance of {@link POTester} with the specified configuration.

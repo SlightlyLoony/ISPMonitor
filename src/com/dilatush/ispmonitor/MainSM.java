@@ -31,10 +31,11 @@ public class MainSM implements StateMachine<MainState> {
     private final Timer                               timer;
     private final Mailbox                             mailbox;
 
-    private MainState       state;
-    private EdgeRouter      edgeRouter;
-    private RemoteHosts     hosts;
-    private POTester        poTester;
+    private MainState          state;
+    private EdgeRouter         edgeRouter;
+    private RemoteHosts        hosts;
+    private POTester           poTester;
+    private ConnectivityTester connectivityTester;
 
 
     public MainSM( final Config _config ) {
@@ -89,6 +90,9 @@ public class MainSM implements StateMachine<MainState> {
         // sanity check...
         if( state != INITIAL )
             throw new IllegalStateException( "Start event occurred while in " + state + " state, instead of INITIAL state" );
+
+        // start up our connectivity tester...
+        connectivityTester = new ConnectivityTester( config );
 
         // get our edge router and query its state...
         edgeRouter = new EdgeRouter( config );
