@@ -35,6 +35,8 @@ public class POTester {
      * Creates a new instance of {@link POTester} with the specified configuration.
      *
      * @param _config the configuration data
+     * @param _hosts the {@link RemoteHosts} containing information about services that use MOP post offices
+     * @param _mailbox the MOP mailbox to be used for querying the MOP central post office
      */
     public POTester( final Config _config, final RemoteHosts _hosts, final Mailbox _mailbox ) {
 

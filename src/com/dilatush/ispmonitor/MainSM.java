@@ -10,6 +10,8 @@ import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.Heartbeat;
 import static com.dilatush.ispmonitor.MainState.INITIAL;
+import static com.dilatush.ispmonitor.SystemAvailability.*;
+import static com.dilatush.util.General.isNotNull;
 
 /**
  * Implements the state machine that is the heart of ISPMonitor.  Events are dispatched from a single thread (in an instance of {@link EventQueue}),
@@ -65,10 +67,11 @@ public class MainSM implements StateMachine<MainState> {
 
             case Heartbeat:                handleHeartbeat();                                                                            break;
             case Start:                    handleStart();                                                                                break;
-            case SSHResult:                handleSSHResult(             (SSHResult)          _event.payload );                           break;
-            case DNSResult:                handleDNSResult(             (DNSResult)          _event.payload );                           break;
-            case RouterISP:                handleRouterISP(             (ISPChoice)          _event.payload );                           break;
-            case PostOfficeTest:           handlePostOfficeTest(        (POTestResult)       _event.payload );                           break;
+            case SSHResult:                handleSSHResult(             (SSHResult)              _event.payload );                       break;
+            case DNSResult:                handleDNSResult(             (DNSResult)              _event.payload );                       break;
+            case RouterISP:                handleRouterISP(             (ISPChoice)              _event.payload );                       break;
+            case PostOfficeTest:           handlePostOfficeTest(        (POTestResult)           _event.payload );                       break;
+            case ConnectivityTest:         handleConnectivityTest(      (ConnectivityTestResult) _event.payload );                       break;
 
             default:
                 LOGGER.warning( "Unknown event type (" + _event.type + ") received by state machine; ignoring" );
@@ -106,6 +109,15 @@ public class MainSM implements StateMachine<MainState> {
 
         // start our heartbeat...
         ISPMonitor.getTimer().scheduleAtFixedRate( HEARTBEAT_TIMER_TASK, HEARTBEAT_MS, HEARTBEAT_MS );
+
+        /////// test code //////////
+        hosts.getHost( "paradise.dilatush.com" ).setDesiredTunnelState( UP );
+        ////////////////////////////
+    }
+
+
+    private void handleConnectivityTest( final ConnectivityTestResult _result ) {
+        _result.handler.handle( _result );
     }
 
 
@@ -128,7 +140,10 @@ public class MainSM implements StateMachine<MainState> {
 
     private void handleHeartbeat() {
 
-        edgeRouter.heartbeat();
+        if( isNotNull( edgeRouter) )
+            edgeRouter.heartbeat();
+        if( isNotNull( hosts ) )
+            hosts.heartbeat();
     }
 
 

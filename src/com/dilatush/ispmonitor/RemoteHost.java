@@ -8,6 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import static com.dilatush.ispmonitor.SystemAvailability.*;
+import static com.dilatush.util.General.isNotNull;
+
 /**
  * Contains information about a remote host, including the services it hosts and the SSH tunnel we might have to it.  Provides methods to start, stop,
  * or restart all configured services on the remote host.
@@ -25,6 +28,9 @@ import java.util.logging.Logger;
     private final SSHTunnel                  tunnel;              // null if this remote host has no tunnel to it...
     private final Map<String, RemoteService> services;            // key is the service's systemd name...
 
+    private SystemAvailability               desiredTunnelState;
+    private SystemAvailability               actualTunnelState;
+
 
     /**
      * Creates a new instance of {@link RemoteHost} using the specified configuration, which is one {@link JSONObject} in the array under the top-
@@ -35,12 +41,14 @@ import java.util.logging.Logger;
     /* package-private */ RemoteHost( final JSONObject _config ) {
 
         // the basics...
-        hostname     = _config.getString( "hostname"     );
-        user         = _config.has( "user" ) ? _config.getString( "user" ) : null;
-        identityFile = _config.has( "identityFile" ) ? _config.getString( "identityFile" ) : null;
+        hostname           = _config.getString( "hostname"     );
+        user               = _config.has( "user" ) ? _config.getString( "user" ) : null;
+        identityFile       = _config.has( "identityFile" ) ? _config.getString( "identityFile" ) : null;
+        desiredTunnelState = DOWN;
+        actualTunnelState  = DOWN;
 
         // get our tunnel, if we have one...
-        tunnel = _config.has( "tunnel" ) ? new SSHTunnel( _config.getJSONObject( "tunnel" ) ) : null;
+        tunnel = SSHTunnel.getTunnelIfSpecified( this, _config );
 
         // get any commands we might have...
         commands = Command.getCommands( _config, "commands" );
@@ -53,6 +61,17 @@ import java.util.logging.Logger;
                 JSONObject serviceObj = serviceArray.getJSONObject( i );
                 services.put( serviceObj.getString( "name" ), new RemoteService( this, serviceObj ) );
             }
+        }
+    }
+
+
+    /* package-private */ void heartbeat() {
+
+        // if we have a tunnel, and the tunnel is supposed to be up, but it's not, then start it up...
+        if( isNotNull( tunnel ) && (desiredTunnelState == UP) && (actualTunnelState != UP) ) {
+            tunnel.start();
+            if( tunnel.isUp() )
+                actualTunnelState = UP;
         }
     }
 
@@ -111,5 +130,20 @@ import java.util.logging.Logger;
 
     /* package-private */ SSHTunnel getTunnel() {
         return tunnel;
+    }
+
+
+    public SystemAvailability getDesiredTunnelState() {
+        return desiredTunnelState;
+    }
+
+
+    public void setDesiredTunnelState( final SystemAvailability _desiredTunnelState ) {
+        desiredTunnelState = _desiredTunnelState;
+    }
+
+
+    public SystemAvailability getActualTunnelState() {
+        return actualTunnelState;
     }
 }

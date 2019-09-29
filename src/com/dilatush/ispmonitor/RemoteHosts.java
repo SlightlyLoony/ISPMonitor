@@ -59,6 +59,15 @@ import static com.dilatush.util.General.isNotNull;
     }
 
 
+    /* package-private */ void heartbeat() {
+
+        // call heartbeat on each configured host...
+        for( RemoteHost host : hosts.values() ) {
+            host.heartbeat();
+        }
+    }
+
+
     /* package-private */ Set<RemoteService> getServicesUsingPostOffice() {
         return new HashSet<>( servicesByPO.values() );
     }
@@ -72,5 +81,10 @@ import static com.dilatush.util.General.isNotNull;
      */
     /* package-private */ RemoteService getServiceUsingPostOffice( final String _postOffice ) {
         return servicesByPO.get( _postOffice );
+    }
+
+
+    /* package-private */ RemoteHost getHost( final String _hostname ) {
+        return hosts.get( _hostname );
     }
 }

@@ -1,6 +1,7 @@
 package com.dilatush.ispmonitor;
 
 import com.dilatush.mop.Mailbox;
+import com.dilatush.mop.Message;
 import com.dilatush.mop.PostOffice;
 import com.dilatush.util.Config;
 
@@ -12,6 +13,7 @@ import java.util.logging.Logger;
 
 import static com.dilatush.ispmonitor.EventType.Start;
 import static com.dilatush.util.General.isNotNull;
+import static com.dilatush.util.Strings.isEmpty;
 
 /**
  *
@@ -70,7 +72,12 @@ public class ISPMonitor {
 
         // start up our post office...
         po = new PostOffice( config );
-        mailbox = po.createMailbox( "ISPMonitor" );
+        mailbox = po.createMailbox( "monitor" );
+
+        // wait until we've connected to the central post office...
+        while( !po.isConnected() ) {
+            Thread.sleep( 100 );
+        }
 
         // set up and start our state machine...
         mainStateMachine = new MainSM( ispMonConfig );
@@ -114,6 +121,41 @@ public class ISPMonitor {
     /* package-private */ static void executeTask( final Task _task ) {
         if( !tasks.offer( _task ) )
             throw new IllegalStateException( "ISPMonitor task queue is full" );
+    }
+
+
+    /**
+     * Sends an event message to the MOP events system.  The message has "isp.monitor" as its source; the rest of the attributes are as specified.
+     *
+     * @param _tag the tag for the event
+     * @param _type the type for the event
+     * @param _subject the subject of the event (for email and text)
+     * @param _message the message about the event
+     * @param _level the level of the event (0..9)
+     */
+    /* package-private */ static void sendMOPEvent( final String _tag, final String _type, final String _subject,
+                                                    final String _message, final int _level ) {
+
+        // sanity checks...
+        if( isEmpty( _tag ) || isEmpty( _type ) || isEmpty( _subject ) || isEmpty( _message ) )
+            throw new IllegalArgumentException( "String argument missing" );
+        if( (_level < 0) || (_level > 9) )
+            throw new IllegalArgumentException( "Level is out of range (0..9): " + _level );
+
+        // build the event message...
+        Message msg = mailbox.createDirectMessage( "events.post", "event.post", false );
+        msg.put( "tag", _tag );
+        msg.put( "timestamp", System.currentTimeMillis() );
+        msg.putDotted( "event.source",  "isp.monitor" );
+        msg.putDotted( "event.type",    _type         );
+        msg.putDotted( "event.message", _message      );
+        msg.putDotted( "event.level",   _level        );
+        msg.putDotted( "event.subject", _subject      );
+
+        // send it...
+        mailbox.send( msg );
+
+        LOGGER.finer( "Sent event: " + _tag + ", " + _subject );
     }
 
 

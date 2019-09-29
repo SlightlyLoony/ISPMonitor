@@ -7,14 +7,15 @@ package com.dilatush.ispmonitor;
  */
 public enum EventType {
 
-    Heartbeat                       ( null ),
-    Start                           ( null ),
-    SSHResult                       ( SSHResult.class ),
-    DNSResult                       ( DNSResult.class ),
-    ISPAvailabilityChanged          ( ISP.class ),
-    ISPChangeNeeded                 ( EdgeRouter.class ),
-    PostOfficeTest                  ( POTestResult.class ),
-    RouterISP                       ( ISPChoice.class );
+    Heartbeat                       ( null                         ),
+    Start                           ( null                         ),
+    SSHResult                       ( SSHResult.class              ),
+    DNSResult                       ( DNSResult.class              ),
+    ISPAvailabilityChanged          ( ISP.class                    ),
+    ISPChangeNeeded                 ( EdgeRouter.class             ),
+    PostOfficeTest                  ( POTestResult.class           ),
+    RouterISP                       ( ISPChoice.class              ),
+    ConnectivityTest                ( ConnectivityTestResult.class );
 
     public final Class payloadClass;
 
